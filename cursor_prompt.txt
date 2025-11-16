@@ -1,0 +1,41 @@
+  🎓 Cursor Prompt for Tomorrow
+
+  When you open Cursor tomorrow, use this prompt:
+
+  I'm starting Day 1 of Week 1 - building the foundation layer.
+
+  Context files to read:
+  1. AGENT_IMPLEMENTATION_PLAN.md (Week 1, Day 1-2)
+  2. .cursorrules (coding standards)
+  3. docs/specs/API_CONTRACTS.md (Persona data model)
+  4. MICROSOFT_FRAMEWORK_INTEGRATION_SUMMARY.md (architecture)
+
+  Task: Implement src/foundation/agents/persona.py
+
+  Requirements:
+  - Persona and Permission classes
+  - Full type hints
+  - Docstrings
+  - 100% test coverage
+
+  Use Microsoft Agent Framework (already installed):
+  - We're NOT building BaseAgent (use Microsoft's ChatAgent)
+  - We're NOT building MCPClientManager (use Microsoft's MCPTool)
+  - We ARE building our unique Persona system
+
+  Please implement following the plan in AGENT_IMPLEMENTATION_PLAN.md.
+
+  ---
+  🔑 Key Takeaway
+
+  Primary file to follow: AGENT_IMPLEMENTATION_PLAN.md
+
+  This is your day-by-day implementation guide with complete code examples. Everything else is supporting reference.
+
+  Simple Flow:
+  1. Today: Read understanding docs (40 min) + setup
+  2. Tomorrow: Open AGENT_IMPLEMENTATION_PLAN.md → Week 1 → Day 1
+  3. Daily: Follow the plan, reference API_CONTRACTS.md and TESTING_STRATEGY.md as needed
+
+  ---
+  You're ready! Start with START_HERE.md → MICROSOFT summary → AGENT_IMPLEMENTATION_PLAN.md 🚀
