@@ -1,0 +1,540 @@
+# Cursor AI Rules for Generic Agentic Platform
+
+## Project Context
+
+You are working on a **Generic Agentic Platform** with Jira as the first use case.
+
+### Core Principles
+1. **Generic First, Specific Second**: The foundation layer (Layer 1) MUST be domain-agnostic and reusable for ANY use case (HR, Support, Sales, etc.)
+2. **Persona-Based Access Control**: All agent capabilities are defined by personas with explicit permissions
+3. **MCP-First Architecture**: All external integrations happen via MCP servers
+4. **Test-Driven Development**: Foundation layer requires 100% test coverage before proceeding
+5. **Security by Design**: Never bypass permission checks, never expose admin tools to non-admin personas
+
+### Architecture Layers (Read AGENT_ARCHITECTURE.md)
+```
+Layer 5: Frontend (Persona-Aware UI) - Next.js, React, TypeScript
+Layer 4: Orchestrator (Routes to persona agents) - Python, FastAPI
+Layer 3: Persona Agents (General User | Admin) - Python, domain-specific
+Layer 2: MCP Servers (Jira | Graph | Azure AI) - Python, FastMCP
+Layer 1: Foundation (Generic & Reusable) - Python, completely domain-agnostic
+```
+
+### Implementation Plan (Read AGENT_IMPLEMENTATION_PLAN.md)
+- **Week 1** (3 days): Foundation layer (Persona, MCPServerRegistry, PersonaMCPMapper) - Uses Microsoft Agent Framework ⭐
+- **Week 2**: Jira MCP Server (12 tools with FastMCP)
+- **Week 3**: Persona Agents (Using Microsoft's ChatAgent)
+- **Week 4**: Orchestrator + FastAPI backend
+- **Weeks 5-7**: Frontend (Next.js)
+
+### Microsoft Agent Framework Integration ⭐
+We use Microsoft's Agent Framework for MCP integration and agent execution:
+- **agent-framework-core**: MCP integration, OpenTelemetry, multi-LLM support
+- **agent-framework-azure-ai**: Azure AI integration
+- See `MICROSOFT_FRAMEWORK_INTEGRATION_SUMMARY.md` for details
+
+## Code Style and Standards
+
+### Python (Backend)
+- **Version**: Python 3.10+
+- **Formatter**: ruff format
+- **Linter**: ruff check
+- **Type Checker**: mypy --strict
+- **Testing**: pytest with pytest-asyncio
+
+#### Code Conventions
+```python
+# Use dataclasses for data structures
+from dataclasses import dataclass
+from typing import List, Optional
+
+# Always use type hints
+def process_data(items: List[str], max_count: Optional[int] = None) -> dict:
+    pass
+
+# Use async/await for IO operations
+async def fetch_data(url: str) -> dict:
+    pass
+
+# Use ABC for abstract base classes
+from abc import ABC, abstractmethod
+
+class BaseAgent(ABC):
+    @abstractmethod
+    async def execute(self, task: str) -> AgentResponse:
+        pass
+```
+
+#### Naming Conventions
+- Classes: PascalCase (e.g., `BaseAgent`, `MCPClientManager`)
+- Functions/methods: snake_case (e.g., `execute_task`, `can_use_tool`)
+- Constants: UPPER_SNAKE_CASE (e.g., `MAX_RETRIES`, `DEFAULT_TIMEOUT`)
+- Private methods: _leading_underscore (e.g., `_internal_method`)
+
+#### Documentation
+```python
+def complex_function(param1: str, param2: int) -> dict:
+    """
+    One-line summary of what the function does.
+
+    Longer explanation if needed, describing the behavior,
+    edge cases, and important details.
+
+    Args:
+        param1: Description of param1
+        param2: Description of param2
+
+    Returns:
+        Description of return value
+
+    Raises:
+        ValueError: When param2 is negative
+    """
+    pass
+```
+
+### TypeScript/React (Frontend)
+- **Framework**: Next.js 15 (App Router)
+- **Style**: Tailwind CSS + shadcn/ui
+- **Linter**: ESLint with Next.js config
+- **Formatter**: Prettier
+
+## Critical Rules for Foundation Layer (Week 1)
+
+### ❌ NEVER in Foundation Layer
+- Jira-specific code (no "issue", "project", "sprint" logic)
+- Hard-coded tool names from specific domains
+- Domain-specific validation logic
+- Any business logic tied to Jira
+
+### ✅ ALWAYS in Foundation Layer
+- Abstract, generic interfaces
+- Domain-agnostic error handling
+- Reusable authentication patterns
+- Generic permission checking
+- Tool discovery and filtering mechanisms
+
+### Foundation Code Review Checklist
+Before committing any foundation code, ask:
+- [ ] Can this be used for an HR use case?
+- [ ] Can this be used for a Support use case?
+- [ ] Does this mention any domain-specific terms (Jira, issue, etc.)?
+- [ ] Are all type hints present and correct?
+- [ ] Are there unit tests with 100% coverage?
+- [ ] Is there docstring documentation?
+
+## Persona and Permission Patterns
+
+### Defining Personas
+```python
+# ✅ CORRECT: Generic permission structure
+general_user = Persona(
+    name="general_user",
+    permissions=[
+        Permission("resource", "read", "*"),
+        Permission("resource", "write", "own"),
+    ],
+    allowed_tools=["search_tool", "create_tool"]
+)
+
+# ❌ WRONG: Domain-specific in foundation
+general_user = Persona(
+    name="general_user",
+    jira_permissions=["read_issues", "create_issues"]  # Too specific!
+)
+```
+
+### Permission Checking
+```python
+# ✅ CORRECT: Generic permission check
+if persona.has_permission(resource="jira", action="write", scope="own"):
+    # Allow operation
+    pass
+
+# ✅ CORRECT: Tool filtering
+allowed_tools = persona.allowed_tools
+if tool_name not in allowed_tools:
+    raise PermissionError(f"Tool {tool_name} not allowed")
+```
+
+## MCP Server Integration with Microsoft Agent Framework
+
+### Using Microsoft's MCPTool Classes
+```python
+# ✅ CORRECT: Create persona-filtered MCP tools
+from agent_framework import MCPStreamableHTTPTool, ChatAgent, OpenAIChatClient
+from foundation.mcp import MCPServerRegistry, MCPServerConfig, PersonaMCPMapper
+
+# 1. Register MCP server config
+registry = MCPServerRegistry()
+registry.register_config(MCPServerConfig(
+    name="jira",
+    transport="http",
+    url="https://jira-mcp.example.com/mcp",
+    headers={"Authorization": "Bearer token"}
+))
+
+# 2. Map persona to tools (our innovation)
+mapper = PersonaMCPMapper(registry)
+jira_tool = mapper.get_mcp_tool_for_persona(
+    persona=GENERAL_USER_PERSONA,
+    server_name="jira"
+)
+
+# 3. Use Microsoft's ChatAgent
+agent = ChatAgent(
+    chat_client=OpenAIChatClient(api_key="..."),
+    name="GeneralUserAgent",
+    instructions="You are a Jira assistant...",
+    tools=jira_tool  # Auto-expands to AIFunctions
+)
+
+# 4. Execute tasks (Microsoft handles tool calls)
+result = await agent.execute("Show my assigned bugs")
+
+# ❌ WRONG: Direct API calls (bypass MCP)
+# Never call Jira API directly from agents
+```
+
+### Creating Agents with Microsoft Framework
+```python
+# ✅ CORRECT: Use Microsoft's ChatAgent, wrap in our response format
+class GeneralUserAgent:
+    def __init__(self, mcp_registry: MCPServerRegistry, llm_config: dict):
+        mapper = PersonaMCPMapper(mcp_registry)
+        jira_tool = mapper.get_mcp_tool_for_persona(
+            GENERAL_USER_PERSONA, "jira"
+        )
+
+        self.agent = ChatAgent(
+            chat_client=OpenAIChatClient(**llm_config),
+            tools=jira_tool
+        )
+
+    async def execute(self, task: str, user_context: dict) -> AgentResponse:
+        result = await self.agent.execute(task)
+        return AgentResponse(success=True, message=str(result), ...)
+
+# ❌ WRONG: Building custom agent from scratch
+# Don't reinvent what Microsoft provides
+```
+
+### Error Handling
+```python
+# ✅ CORRECT: Comprehensive error handling
+try:
+    result = await mcp_manager.call_tool(server, tool, params)
+except PermissionError as e:
+    return AgentResponse(
+        success=False,
+        error=f"Permission denied: {e}",
+        message="You don't have permission to perform this action"
+    )
+except Exception as e:
+    logger.error(f"Tool execution failed: {e}", exc_info=True)
+    return AgentResponse(
+        success=False,
+        error=str(e),
+        message="An error occurred while executing the tool"
+    )
+```
+
+## Testing Requirements
+
+### Foundation Layer (100% Coverage Required)
+```python
+# Every foundation class needs:
+# 1. Unit tests for all public methods
+# 2. Edge case tests
+# 3. Error handling tests
+# 4. Mock external dependencies
+
+@pytest.fixture
+def sample_persona():
+    return Persona(
+        name="test",
+        permissions=[Permission("resource", "read", "*")],
+        allowed_tools=["tool1", "tool2"]
+    )
+
+def test_persona_can_use_tool(sample_persona):
+    assert sample_persona.can_use_tool("tool1")
+    assert not sample_persona.can_use_tool("tool3")
+
+def test_persona_has_permission(sample_persona):
+    assert sample_persona.has_permission("resource", "read", "*")
+    assert not sample_persona.has_permission("resource", "write", "*")
+```
+
+### Agent Layer (95% Coverage Required)
+```python
+# Test all permission boundaries
+@pytest.mark.asyncio
+async def test_general_user_cannot_delete():
+    agent = GeneralUserAgent(mcp_manager)
+    response = await agent.execute(
+        "Delete issue JB-123",
+        {"email": "user@example.com"}
+    )
+    assert not response.success
+    assert "permission" in response.error.lower()
+```
+
+## Security Guidelines
+
+### Never Trust User Input
+```python
+# ✅ CORRECT: Validate and sanitize
+def validate_jql(jql: str) -> str:
+    # Check for injection attacks
+    if ";" in jql or "--" in jql:
+        raise ValueError("Invalid JQL")
+    return jql
+
+# ✅ CORRECT: Limit scope based on persona
+def enhance_jql_for_user(jql: str, user_email: str) -> str:
+    return f"({jql}) AND assignee = {user_email}"
+```
+
+### Permission Enforcement
+```python
+# ✅ CORRECT: Always check permissions before action
+async def update_issue(self, issue_key: str, fields: dict):
+    # 1. Check if user can use update tool
+    if not self.persona.can_use_tool("jira_update_issue"):
+        raise PermissionError("Tool not allowed")
+
+    # 2. Check if user owns the issue (for general users)
+    if self.persona.has_permission("jira", "write", "own"):
+        if not await self._user_owns_issue(issue_key):
+            raise PermissionError("Can only update own issues")
+
+    # 3. Proceed with update
+    return await self.mcp_manager.call_tool(...)
+```
+
+## Common Patterns
+
+### Agent Response Pattern
+```python
+# ✅ Always return AgentResponse
+async def execute(self, task: str, user_context: dict) -> AgentResponse:
+    try:
+        # Process task
+        result = await self._process_task(task, user_context)
+
+        return AgentResponse(
+            success=True,
+            message="Task completed successfully",
+            data=result,
+            tool_executions=[...]  # Track which tools were used
+        )
+    except PermissionError as e:
+        return AgentResponse(
+            success=False,
+            message="Permission denied",
+            error=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Task failed: {e}", exc_info=True)
+        return AgentResponse(
+            success=False,
+            message="Task failed",
+            error=str(e)
+        )
+```
+
+### Logging Pattern
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+# ✅ CORRECT: Structured logging
+logger.info(
+    "Agent executing task",
+    extra={
+        "agent": self.name,
+        "persona": self.persona.name,
+        "task": task,
+        "user": user_context.get("email")
+    }
+)
+
+# ✅ CORRECT: Log errors with stack trace
+logger.error(f"Task execution failed: {e}", exc_info=True)
+```
+
+## File Organization
+
+### Foundation Layer Structure (Simplified ⭐)
+```
+src/foundation/
+├── agents/
+│   ├── persona.py           # Persona, Permission (OUR CORE VALUE)
+│   └── agent_response.py    # AgentResponse, ToolExecution
+├── mcp/
+│   ├── __init__.py          # Re-export Microsoft's classes
+│   ├── server_registry.py   # MCPServerRegistry (config storage)
+│   └── persona_mapper.py    # PersonaMCPMapper (OUR INNOVATION)
+├── auth/
+│   ├── permission_checker.py  # Simplified permissions
+│   └── azure_ad_auth.py
+└── utils/
+    ├── logging.py
+    └── telemetry.py
+```
+
+**Key Changes from Original Plan**:
+- ❌ **Removed**: `base_agent.py` (use Microsoft's ChatAgent)
+- ❌ **Removed**: `client_manager.py` (use Microsoft's MCPTool classes)
+- ❌ **Removed**: `tool_registry.py` (built into Microsoft's MCPTool)
+- ✅ **Added**: `persona_mapper.py` (our unique value on top of Microsoft)
+- ✅ **Simplified**: `server_registry.py` (config storage only, no session management)
+
+### Test Organization (Updated)
+```
+tests/
+├── unit/
+│   ├── foundation/
+│   │   ├── test_persona.py              # Test Persona and Permission
+│   │   ├── test_server_registry.py      # Test MCPServerRegistry
+│   │   ├── test_persona_mapper.py       # Test PersonaMCPMapper ⭐
+│   │   └── test_agent_response.py       # Test AgentResponse
+│   └── agents/
+│       ├── test_general_user_agent.py   # Test with mocked Microsoft ChatAgent
+│       └── test_admin_agent.py
+├── integration/
+│   ├── test_mcp_integration.py          # Test with Microsoft's framework
+│   └── test_orchestrator.py
+└── fixtures/
+    ├── sample_data.py
+    └── mock_mcp_server.py               # Mock MCP server for testing
+```
+
+**Testing Strategy with Microsoft Framework**:
+- Mock Microsoft's `ChatAgent` for unit tests
+- Use real Microsoft classes for integration tests
+- Focus tests on our unique logic (Persona mapping, permissions)
+- Trust Microsoft's tests for their MCPTool implementations
+
+## Git Commit Messages
+
+Follow conventional commits:
+```
+feat(foundation): add BaseAgent abstract class
+fix(persona): correct permission scope checking
+test(mcp): add unit tests for MCPClientManager
+docs(readme): update architecture diagram
+refactor(agent): simplify task execution logic
+```
+
+## Pre-Commit Checklist
+
+Before committing code:
+- [ ] Run `ruff check .` (no errors)
+- [ ] Run `ruff format .` (code formatted)
+- [ ] Run `mypy src/` (no type errors)
+- [ ] Run `pytest` (all tests pass)
+- [ ] Run `pytest --cov` (coverage meets threshold)
+- [ ] Update docstrings if APIs changed
+- [ ] Update tests if behavior changed
+
+## Common Mistakes to Avoid
+
+### ❌ Don't Do This
+```python
+# 1. Hard-coding domain logic in foundation
+class BaseAgent:
+    def search_jira(self, jql: str):  # ❌ Jira-specific!
+        pass
+
+# 2. Skipping permission checks
+async def execute(self, task):
+    return await self.mcp_manager.call_tool(...)  # ❌ No permission check!
+
+# 3. Missing error handling
+result = await self.mcp_manager.call_tool(...)  # ❌ No try/except!
+
+# 4. No type hints
+def process(data):  # ❌ No types!
+    pass
+
+# 5. Mutable default arguments
+def create_agent(tools=[]):  # ❌ Mutable default!
+    pass
+```
+
+### ✅ Do This Instead
+```python
+# 1. Generic interfaces
+class BaseAgent(ABC):
+    @abstractmethod
+    async def execute(self, task: str, context: dict) -> AgentResponse:
+        pass
+
+# 2. Always check permissions
+if not self.can_use_tool(tool_name):
+    raise PermissionError(f"Tool {tool_name} not allowed")
+
+# 3. Comprehensive error handling
+try:
+    result = await self.mcp_manager.call_tool(...)
+except Exception as e:
+    logger.error(f"Error: {e}", exc_info=True)
+    return AgentResponse(success=False, error=str(e))
+
+# 4. Type hints everywhere
+def process(data: dict) -> List[str]:
+    pass
+
+# 5. Immutable defaults
+def create_agent(tools: Optional[List[str]] = None) -> Agent:
+    tools = tools or []
+    pass
+```
+
+## Performance Guidelines
+
+- Use `async`/`await` for all I/O operations
+- Cache tool lists from MCP servers
+- Use connection pooling for MCP connections
+- Implement request timeouts (default: 30s)
+- Add retry logic with exponential backoff
+
+## Deployment Checklist
+
+Before deploying:
+- [ ] All environment variables in Azure Key Vault
+- [ ] Health check endpoint responding
+- [ ] Monitoring/logging configured (Application Insights)
+- [ ] Rate limiting configured
+- [ ] CORS configured correctly
+- [ ] Authentication working (Azure AD)
+
+## When in Doubt
+
+1. **Is this foundation code?** → Make it domain-agnostic
+2. **Is this secure?** → Add permission checks
+3. **Is this tested?** → Write unit tests
+4. **Is this typed?** → Add type hints
+5. **Is this documented?** → Add docstrings
+
+## Resources
+
+### Core Documentation
+- **Architecture**: See `AGENT_ARCHITECTURE.md`
+- **Implementation Guide**: See `AGENT_IMPLEMENTATION_PLAN.md` (updated with Microsoft framework)
+- **API Specs**: See `docs/specs/API_CONTRACTS.md`
+- **Testing**: See `docs/specs/TESTING_STRATEGY.md`
+- **Technical Review**: See `docs/guides/TECHNICAL_REVIEW.md`
+
+### Microsoft Agent Framework Integration ⭐
+- **Quick Summary**: See `MICROSOFT_FRAMEWORK_INTEGRATION_SUMMARY.md` (10 min read)
+- **Full Analysis**: See `docs/guides/MICROSOFT_AGENT_FRAMEWORK_ANALYSIS.md` (deep dive)
+- **Architecture Changes**: See `docs/guides/ARCHITECTURE_CHANGES.md` (migration guide)
+- **Analysis Complete**: See `ANALYSIS_COMPLETE.md` (status and benefits)
+
+### Reference Code
+- **Microsoft Agent Framework**: https://github.com/microsoft/agent-framework
+- **MCP Atlassian**: `/tmp/mcp-atlassian` (reference implementation)

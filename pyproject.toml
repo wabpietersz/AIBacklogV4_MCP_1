@@ -1,0 +1,171 @@
+[project]
+name = "generic-agentic-platform"
+version = "0.1.0"
+description = "Generic agentic platform with persona-based access control"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+
+dependencies = [
+    # Core frameworks
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.5.0",
+
+    # Microsoft Agent Framework (includes MCP, OpenTelemetry, OpenAI)
+    "agent-framework-core>=1.0.0",
+    "agent-framework-azure-ai>=1.0.0",
+    # Note: agent-framework-core includes:
+    #   - mcp[ws]>=1.13
+    #   - openai>=1.99.0
+    #   - opentelemetry-api, opentelemetry-sdk, etc.
+
+    # Jira integration (for MCP server only)
+    "atlassian-python-api>=3.41.0",
+    "httpx>=0.25.0",
+
+    # FastMCP (for building MCP server in Week 2)
+    "fastmcp>=2.0.0",
+
+    # Azure SDK
+    "azure-identity>=1.15.0",
+    "azure-keyvault-secrets>=4.7.0",
+    "msal>=1.25.0",
+
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "structlog>=23.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "pytest-httpx>=0.27.0",
+
+    # Linting and formatting
+    "ruff>=0.1.6",
+    "mypy>=1.7.0",
+
+    # Type stubs
+    "types-requests>=2.31.0",
+
+    # Development tools
+    "ipython>=8.18.0",
+    "ipdb>=0.13.13",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # unused imports in __init__.py
+"tests/**/*.py" = ["ARG"]  # unused arguments in tests
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+follow_imports = "normal"
+namespace_packages = true
+
+# Allow untyped calls for third-party libraries without stubs
+[[tool.mypy.overrides]]
+module = [
+    "atlassian.*",
+    "fastmcp.*",
+    "mcp.*",
+    "applicationinsights.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow tests",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "tests/*",
+    "**/__pycache__/*",
+    "**/.venv/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+# Coverage thresholds by layer
+[tool.coverage.foundation]
+fail_under = 100  # Foundation must have 100% coverage
+
+[tool.coverage.agents]
+fail_under = 95   # Agents must have 95% coverage
+
+[tool.coverage.orchestration]
+fail_under = 90   # Orchestration must have 90% coverage
+
+[tool.coverage.mcp_servers]
+fail_under = 90   # MCP servers must have 90% coverage
